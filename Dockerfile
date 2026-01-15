@@ -706,11 +706,20 @@ RUN git clone -b 0.3.62 --depth=1 https://github.com/PipeWire/pipewire.git \
 		-Dexamples=disabled \
 		-Dspa-plugins=disabled \
 		-Dsession-managers= \
+		-Ddbus=disabled \
+		-Dsystemd=disabled \
+		-Dsystemd-system-service=disabled \
+		-Dsystemd-user-service=disabled \
+		-Dpipewire-alsa=disabled \
+		-Dpipewire-jack=disabled \
+		-Djack=disabled \
+		-Dlibcamera=disabled \
+		-Dudev=disabled \
+		-Dgstreamer=disabled \
 	&& meson compile -C build \
 	&& DESTDIR=/usr/src/pipewire-cache meson install -C build \
 	&& cd .. \
 	&& rm -rf pipewire
-
 
 FROM builder AS openal
 COPY --link --from=pipewire /usr/src/pipewire-cache /
