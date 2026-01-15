@@ -1,0 +1,133 @@
+name: Build AyuGram Binary
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-binary:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 1440
+    permissions:
+      contents: write
+
+    steps:
+      # ------------------------------------------------------------
+      # Checkout
+      # ------------------------------------------------------------
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+
+      # ------------------------------------------------------------
+      # Sync upstream AyuGram
+      # ------------------------------------------------------------
+      - name: Sync upstream AyuGram
+        run: |
+          git remote add upstream https://github.com/AyuGram/AyuGramDesktop.git || true
+          git fetch upstream --tags
+          git checkout dev
+          git reset --hard upstream/dev
+
+      # ------------------------------------------------------------
+      # Fix & update submodules
+      # ------------------------------------------------------------
+      - name: Fix submodules
+        run: |
+          set -e
+          git submodule init
+
+          git config submodule.Telegram/lib_ui.url https://github.com/desktop-app/lib_ui.git
+          git config submodule.Telegram/ThirdParty/tgcalls.url https://github.com/TelegramMessenger/tgcalls.git
+          git config submodule.codegen.url https://github.com/AyuGram/codegen.git
+          git config submodule.cmake.url https://github.com/telegramdesktop/cmake_helpers.git
+
+          git submodule sync --recursive
+
+          if git submodule update --init --recursive; then
+            echo "Submodules updated normally"
+          else
+            echo "Retry submodules with fallback..."
+            git submodule foreach --recursive '
+              git fetch origin || true
+              git checkout origin/HEAD || git checkout main || git checkout master || true
+            '
+            git submodule update --init --force --recursive
+          fi
+
+      # ------------------------------------------------------------
+      # Get version
+      # ------------------------------------------------------------
+      - name: Get version
+        run: |
+          TAG=$(git describe --tags --abbrev=0)
+          VERSION=${TAG#v}
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "UPSTREAM_COMMIT=$(git rev-parse HEAD)" >> $GITHUB_ENV
+
+      # ------------------------------------------------------------
+      # Cache ccache
+      # ------------------------------------------------------------
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-${{ runner.os }}-${{ env.VERSION }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ env.VERSION }}-
+            ccache-${{ runner.os }}-
+
+      # ------------------------------------------------------------
+      # Build AyuGram
+      # ------------------------------------------------------------
+      - name: Build AyuGram binary
+        run: |
+          docker run --rm \
+            -u root \
+            -e CCACHE_DIR=/usr/src/tdesktop/.ccache \
+            -v "$PWD:/usr/src/tdesktop" \
+            ghcr.io/telegramdesktop/tdesktop/centos_env:latest \
+            bash -c "
+              mkdir -p out .ccache &&
+              ccache -M 10G || true &&
+              export PATH=/usr/lib64/ccache:\$PATH &&
+              /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
+                -D TDESKTOP_API_ID=2040 \
+                -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627
+            "
+
+      # ------------------------------------------------------------
+      # Fix permissions
+      # ------------------------------------------------------------
+      - name: Fix permissions
+        run: |
+          sudo chown -R $USER:$USER out
+
+      # ------------------------------------------------------------
+      # Upload executable as artifact
+      # ------------------------------------------------------------
+      - name: Upload AyuGram binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ayugram-binary-${{ env.VERSION }}
+          path: out/Release/AyuGram
+          retention-days: 30
+
+      # ------------------------------------------------------------
+      # Upload metadata
+      # ------------------------------------------------------------
+      - name: Save build metadata
+        run: |
+          echo "$VERSION" > version.txt
+          echo "$UPSTREAM_COMMIT" > commit.txt
+          
+      - name: Upload metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: ayugram-metadata-${{ env.VERSION }}
+          path: |
+            version.txt
+            commit.txt
+          retention-days: 30
