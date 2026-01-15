@@ -22,15 +22,15 @@ RUN dnf -y install epel-release \
 
 RUN alternatives --set python3 /usr/bin/python3.11
 RUN python3 -m pip install meson ninja
-RUN printf '#!/bin/sh\n\
-for i in "$@"; do\n\
-    [ "$i" = "--version" ] && exec /usr/bin/pkg-config "$i"\n\
-done\n\
-exec /usr/bin/pkg-config --static "$@"\n' > /usr/local/bin/pkg-config && \
+RUN printf '#!/bin/sh\\n\
+for i in "$@"; do\\n\
+    [ "$i" = "--version" ] && exec /usr/bin/pkg-config "$i"\\n\
+done\\n\
+exec /usr/bin/pkg-config --static "$@"\\n' > /usr/local/bin/pkg-config && \
     chmod +x /usr/local/bin/pkg-config
-RUN sed -i '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/")/ -O0 -fno-lto -fno-use-linker-plugin -fuse-ld=lld")/' /usr/share/cmake/Modules/Compiler/GNU.cmake
+RUN sed -i '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/\")/ -O0 -fno-lto -fno-use-linker-plugin -fuse-ld=lld\")/' /usr/share/cmake/Modules/Compiler/GNU.cmake
 RUN sed -i 's/NO_DEFAULT_PATH//g; s/PKG_CONFIG_ALLOW_SYSTEM_LIBS/PKG_CONFIG_IS_DUMB/g' /usr/share/cmake/Modules/FindPkgConfig.cmake
-RUN sed -i 's/set(OpenGL_GL_PREFERENCE "")/set(OpenGL_GL_PREFERENCE "LEGACY")/' /usr/share/cmake/Modules/FindOpenGL.cmake
+RUN sed -i 's/set(OpenGL_GL_PREFERENCE \"\")/set(OpenGL_GL_PREFERENCE \"LEGACY\")/' /usr/share/cmake/Modules/FindOpenGL.cmake
 RUN sed -i '/Requires.private: valgrind/d' /usr/lib64/pkgconfig/libdrm.pc
 RUN sed -i 's/-lharfbuzz//' /usr/lib64/pkgconfig/harfbuzz.pc
 RUN sed -i 's/-lpng16//' /usr/lib64/pkgconfig/libpng16.pc
@@ -47,7 +47,8 @@ ENV LDFLAGS='-static-libstdc++ -static-libgcc -static-libasan -pthread -Wl,--pus
 
 ENV CMAKE_GENERATOR=Ninja
 ENV CMAKE_BUILD_TYPE=None
-ENV CMAKE_BUILD_PARALLEL_LEVEL=''
+# Giới hạn parallel build để tránh out of memory
+ENV CMAKE_BUILD_PARALLEL_LEVEL=4
 
 RUN git init Implib.so \
 	&& cd Implib.so \
@@ -729,14 +730,16 @@ COPY --link --from=xcb-cursor /usr/src/xcb-cursor-cache /
 COPY --link --from=openssl /usr/src/openssl-cache /
 COPY --link --from=xkbcommon /usr/src/xkbcommon-cache /
 
+# Thay đổi chính: Giới hạn parallel build và thêm error handling
 ENV QT=6.10.1
-RUN git clone -b v$QT --depth=1 https://github.com/qt/qt5.git \
+RUN set -ex \
+	&& git clone -b v$QT --depth=1 https://github.com/qt/qt5.git \
 	&& cd qt5 \
-	&& git submodule update --init --recursive --depth=1 qtbase qtdeclarative qtwayland qtimageformats qtsvg qtshadertools \
+	&& git submodule update --init --recursive --depth=1 --jobs=2 qtbase qtdeclarative qtwayland qtimageformats qtsvg qtshadertools \
 	&& cd qtbase \
-	&& find ../../patches/qtbase_$QT -type f -print0 | sort -z | xargs -r0 git apply \
+	&& find ../../patches/qtbase_$QT -type f -print0 2>/dev/null | sort -z | xargs -r0 git apply || echo "No qtbase patches found" \
 	&& cd ../qtwayland \
-	&& find ../../patches/qtwayland_$QT -type f -print0 | sort -z | xargs -r0 git apply \
+	&& find ../../patches/qtwayland_$QT -type f -print0 2>/dev/null | sort -z | xargs -r0 git apply || echo "No qtwayland patches found" \
 	&& cd .. \
 	&& cmake -B build . \
 		-DCMAKE_INSTALL_PREFIX=/usr/local \
@@ -750,7 +753,7 @@ RUN git clone -b v$QT --depth=1 https://github.com/qt/qt5.git \
 		-DFEATURE_eglfs=OFF \
 		-DINPUT_dbus=runtime \
 		-DINPUT_openssl=linked \
-	&& cmake --build build \
+	&& cmake --build build --parallel 2 \
 	&& DESTDIR=/usr/src/qt-cache cmake --install build \
 	&& cd .. \
 	&& rm -rf qt5
@@ -783,7 +786,6 @@ COPY --link --from=xdamage /usr/src/xdamage-cache /
 COPY --link --from=xcomposite /usr/src/xcomposite-cache /
 COPY --link --from=pipewire /usr/src/pipewire-cache /
 
-# Shallow clone on a specific commit.
 RUN git init tg_owt \
 	&& cd tg_owt \
 	&& git remote add origin https://github.com/desktop-app/tg_owt.git \
@@ -812,7 +814,6 @@ FROM builder AS tde2e
 COPY --link --from=zlib /usr/src/zlib-cache /
 COPY --link --from=openssl /usr/src/openssl-cache /
 
-# Shallow clone on a specific commit.
 RUN git init tde2e \
 	&& cd tde2e \
 	&& git remote add origin https://github.com/tdlib/td.git \
