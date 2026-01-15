@@ -22,13 +22,12 @@ RUN dnf -y install epel-release \
 
 RUN alternatives --set python3 /usr/bin/python3.11
 RUN python3 -m pip install meson ninja
-RUN cat <<EOF > /usr/local/bin/pkg-config && chmod +x /usr/local/bin/pkg-config
-#!/bin/sh
-for i in "\$@"; do
-	[ "\$i" = "--version" ] && exec /usr/bin/pkg-config "\$i"
-done
-exec /usr/bin/pkg-config --static "\$@"
-EOF
+RUN printf '#!/bin/sh\n\
+for i in "$@"; do\n\
+    [ "$i" = "--version" ] && exec /usr/bin/pkg-config "$i"\n\
+done\n\
+exec /usr/bin/pkg-config --static "$@"\n' > /usr/local/bin/pkg-config && \
+    chmod +x /usr/local/bin/pkg-config
 RUN sed -i '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/")/ -O0 -fno-lto -fno-use-linker-plugin -fuse-ld=lld")/' /usr/share/cmake/Modules/Compiler/GNU.cmake
 RUN sed -i 's/NO_DEFAULT_PATH//g; s/PKG_CONFIG_ALLOW_SYSTEM_LIBS/PKG_CONFIG_IS_DUMB/g' /usr/share/cmake/Modules/FindPkgConfig.cmake
 RUN sed -i 's/set(OpenGL_GL_PREFERENCE "")/set(OpenGL_GL_PREFERENCE "LEGACY")/' /usr/share/cmake/Modules/FindOpenGL.cmake
