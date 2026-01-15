@@ -142,7 +142,7 @@ FROM builder AS lcms2
 RUN --mount=type=cache,target=/root/.gitcache \
     git clone -b lcms2.15 --depth=1 https://github.com/mm2/Little-CMS.git \
 	&& cd Little-CMS \
-	&& meson build \
+	&& meson setup build \
 		--buildtype=plain \
 		--default-library=static \
 	&& meson compile -C build \
@@ -189,7 +189,7 @@ FROM builder AS dav1d
 RUN --mount=type=cache,target=/root/.gitcache \
     git clone -b 1.5.1 --depth=1 https://github.com/videolan/dav1d.git \
 	&& cd dav1d \
-	&& meson build \
+	&& meson setup build \
 		--buildtype=plain \
 		--default-library=static \
 		-Denable_tools=false \
@@ -203,7 +203,7 @@ FROM builder AS openh264
 RUN --mount=type=cache,target=/root/.gitcache \
     git clone -b v2.6.0 --depth=1 https://github.com/cisco/openh264.git \
 	&& cd openh264 \
-	&& meson build \
+	&& meson setup build \
 		--buildtype=plain \
 		--default-library=static \
 	&& meson compile -C build \
@@ -701,7 +701,7 @@ FROM builder AS pipewire
 RUN --mount=type=cache,target=/root/.gitcache \
     git clone -b 0.3.62 --depth=1 https://github.com/PipeWire/pipewire.git \
 	&& cd pipewire \
-	&& meson build \
+	&& meson setup build \
 		--buildtype=plain \
 		-Dtests=disabled \
 		-Dexamples=disabled \
@@ -748,7 +748,7 @@ COPY --link --from=xcb /usr/src/xcb-cache /
 RUN --mount=type=cache,target=/root/.gitcache \
     git clone -b xkbcommon-1.6.0 --depth=1 https://github.com/xkbcommon/libxkbcommon.git \
 	&& cd libxkbcommon \
-	&& meson build \
+	&& meson setup build \
 		--buildtype=plain \
 		--default-library=static \
 		-Denable-docs=false \
