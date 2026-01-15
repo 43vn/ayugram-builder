@@ -703,10 +703,35 @@ RUN --mount=type=cache,target=/root/.gitcache \
 	&& cd pipewire \
 	&& meson setup build \
 		--buildtype=plain \
+		--default-library=static \
 		-Dtests=disabled \
 		-Dexamples=disabled \
 		-Dspa-plugins=disabled \
 		-Dsession-managers= \
+		-Ddbus=disabled \
+		-Dalsa=disabled \
+		-Daudiomixer=disabled \
+		-Daudioconvert=disabled \
+		-Dcontrol=disabled \
+		-Daudiotestsrc=disabled \
+		-Dffmpeg=disabled \
+		-Dpipewire-alsa=disabled \
+		-Dpipewire-jack=disabled \
+		-Djack=disabled \
+		-Dpipewire-v4l2=disabled \
+		-Dv4l2=disabled \
+		-Dlibcamera=disabled \
+		-Dvideoconvert=disabled \
+		-Dvideotestsrc=disabled \
+		-Dvolume=disabled \
+		-Dvulkan=disabled \
+		-Dpw-cat=disabled \
+		-Dudev=disabled \
+		-Dudevrulesdir=disabled \
+		-Dsystemd=disabled \
+		-Dgstreamer=disabled \
+		-Dsystemd-system-service=disabled \
+		-Dsystemd-user-service=disabled \
 	&& meson compile -C build \
 	&& DESTDIR=/usr/src/pipewire-cache meson install -C build \
 	&& cd .. \
